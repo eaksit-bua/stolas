@@ -197,13 +197,28 @@ def show_animal(a) -> str:
 show(Dog())  # "Some animal" (Dog inherits from Animal)
 ```
 
-### Union Type Support
+### Multi-Argument Dispatch
+
+Traits can dispatch on **multiple arguments** by registering implementations with multiple types:
 
 ```python
-@show.impl(int | float)  # Works with union types (Python 3.10+)
-def show_number(n) -> str:
-    return f"Number: {n}"
+@trait
+def interact(a, b) -> str:
+    raise NotImplementedError
+
+@interact.impl(Dog, Cat)  # Dispatch on (Dog, Cat)
+def dog_chases_cat(d: Dog, c: Cat) -> str:
+    return f"{d.name} chases {c.name}"
+
+@interact.impl(Cat, Dog)  # Dispatch on (Cat, Dog)
+def cat_hisses_dog(c: Cat, d: Dog) -> str:
+    return f"{c.name} hisses at {d.name}"
+
+# Usage
+interact(dog, cat)  # "Rex chases Whiskers"
+interact(cat, dog)  # "Whiskers hisses at Rex"
 ```
+
 
 ---
 

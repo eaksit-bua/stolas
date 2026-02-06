@@ -9,6 +9,13 @@ def _unwrap_types(types_: tuple[type, ...]) -> tuple[type, ...]:
     """Unwrap Union types into individual types."""
     result: list[type] = []
     for t in types_:
+        # Handle @cases ADTs which have a _union attribute
+        if hasattr(t, "_union"):
+            union_type = getattr(t, "_union")
+            if get_origin(union_type) is Union or get_origin(union_type) is types.UnionType:
+                result.extend(get_args(union_type))
+                continue
+
         origin = get_origin(t)
         if origin is Union or origin is types.UnionType:
             result.extend(get_args(t))
