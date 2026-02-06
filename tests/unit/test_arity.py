@@ -235,6 +235,22 @@ class TestCurriedWrapper:
         assert result == 21
 
 
+class TestValidateArityEdgeCases:
+    """Tests for _validate_arity edge cases."""
+
+    def test_skips_validation_when_signature_fails(self) -> None:
+        """When inspect.signature raises ValueError, validation is skipped."""
+        from unittest.mock import patch
+
+        def add(a: int, b: int) -> int:
+            return a + b
+
+        with patch("stolas.operand.arity.inspect.signature", side_effect=ValueError):
+            # Should not raise despite wrong arity - validation skipped
+            curried = binary(add)
+            assert curried(2, 3) == 5
+
+
 def _run_test_method(instance: object, method_name: str) -> tuple[str, str]:
     """Run a single test method and return result."""
     test_name = f"{instance.__class__.__name__}.{method_name}"

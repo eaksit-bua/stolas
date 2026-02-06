@@ -139,7 +139,7 @@ def show_user(user: User) -> str:
 def show_int(n: int) -> str:
     return f"Integer: {n}"
 
-@show.impl(str, bytes)  # Multiple types at once
+@show.impl(str | bytes)  # Multiple types at once
 def show_text(text) -> str:
     return f"Text: {text}"
 ```

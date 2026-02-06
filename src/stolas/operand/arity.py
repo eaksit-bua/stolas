@@ -94,10 +94,35 @@ def _arity_name(arity: int) -> str:
     return names.get(arity, f"arity_{arity}")
 
 
+import inspect
+
 def _validate_arity(func: Callable[..., Any], arity: int) -> None:
     """Validate function has correct arity."""
-    code = func.__code__
-    actual_arity = code.co_argcount
+    try:
+        sig = inspect.signature(func)
+    except ValueError:
+        # Cannot inspect signature (e.g. built-in), fall back to skip validation
+        # or assume it's correct/let it fail at runtime.
+        return
+
+    # Count parameters that require arguments (ignoring *args, **kwargs, defaults)
+    # Actually, easy way: just check total parameters if no defaults,
+    # or ensuring we can bind exactly 'arity' positional args.
+    
+    # We want exact arity match for strict currying.
+    # However, wrapped functions might have complicated signatures.
+    # Stolas strictness demands exact positional args.
+    
+    params = list(sig.parameters.values())
+    
+    # Filter out *args, **kwargs
+    valid_params = [
+        p for p in params 
+        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    ]
+    
+    actual_arity = len(valid_params)
+    
     if actual_arity != arity:
         raise TypeError(
             f"@{_arity_name(arity)} requires exactly {arity} parameters, "
