@@ -444,6 +444,34 @@ class TestTraitWithPipeline:
         assert result.y == 5
 
 
+class TestTraitWithCasesADT:
+    """Tests for trait with @cases ADT types."""
+
+    def test_impl_with_cases_adt_unwraps_union(self) -> None:
+        """Using @cases ADT in impl() unwraps its _union to register all variants."""
+        from stolas.operand import cases
+
+        @cases
+        class Shape:
+            Circle: Any  # radius
+            Square: Any  # side
+
+        @trait
+        def area(shape: Any) -> int:
+            pass
+
+        @area.impl(Shape)
+        def area_shape(s: Any) -> int:
+            if isinstance(s, Shape.Circle):
+                return s.value * s.value * 3
+            return s.value * s.value
+
+        assert area(Shape.Circle(2)) == 12
+        assert area(Shape.Square(3)) == 9
+        assert Shape.Circle in area.types
+        assert Shape.Square in area.types
+
+
 class TestTraitEdgeCases:
     """Edge case tests."""
 

@@ -88,7 +88,7 @@ python -m pytest tests/
 mypy src/stolas --strict
 ```
 
-**Status:** 🦉 739 tests passing • 100% coverage • 100% mypy strict compliance
+**Status:** 🦉 741 tests passing • 100% coverage • 100% mypy strict compliance
 
 ## 🦉 License
 
