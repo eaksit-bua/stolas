@@ -58,6 +58,7 @@ def _create_value_variant(name: str, parent_name: str) -> type:
             "__slots__": ("_value",),
             "__annotations__": {"_value": Any},
             "__match_args__": ("value",),
+            "__tag__": name,
             "__init__": __init__,
             "__setattr__": __setattr__,
             "__delattr__": __delattr__,
@@ -102,6 +103,7 @@ def _create_unit_variant(name: str, parent_name: str) -> type:
         {
             "__slots__": (),
             "__match_args__": (),
+            "__tag__": name,
             "__new__": __new__,
             "__setattr__": __setattr__,
             "__delattr__": __delattr__,
@@ -115,13 +117,13 @@ def _create_unit_variant(name: str, parent_name: str) -> type:
 
 def _create_variant(
     name: str, variant_type: type, parent_name: str
-) -> tuple[type, bool]:
-    """Create appropriate variant class based on type annotation."""
+) -> tuple[type, str]:
+    """Create a variant class and report its kind: unit | value | existing."""
     if _is_unit_variant(variant_type):
-        return _create_unit_variant(name, parent_name), True
+        return _create_unit_variant(name, parent_name), "unit"
     if _is_existing_class(variant_type):
-        return variant_type, False
-    return _create_value_variant(name, parent_name), False
+        return variant_type, "existing"
+    return _create_value_variant(name, parent_name), "value"
 
 
 def cases(cls: type) -> type:
@@ -129,18 +131,26 @@ def cases(cls: type) -> type:
     annotations = get_type_hints(cls) if hasattr(cls, "__annotations__") else {}
     variants: dict[str, type] = {}
     variant_types: list[type] = []
+    # Reverse map (variant class -> tag) and per-tag kind, used by the serde
+    # codec for type-directed tagging of @cases unions.
+    variant_names: dict[type, str] = {}
+    variant_kinds: dict[str, str] = {}
 
     for name, variant_type in annotations.items():
-        variant_cls, is_singleton = _create_variant(name, variant_type, cls.__name__)
+        variant_cls, kind = _create_variant(name, variant_type, cls.__name__)
         variants[name] = variant_cls
         variant_types.append(variant_cls)
+        variant_names[variant_cls] = name
+        variant_kinds[name] = kind
 
-        if is_singleton:
+        if kind == "unit":
             setattr(cls, name, variant_cls())
         else:
             setattr(cls, name, variant_cls)
 
     cls._variants = variants  # type: ignore[attr-defined]
+    cls._variant_names = variant_names  # type: ignore[attr-defined]
+    cls._variant_kinds = variant_kinds  # type: ignore[attr-defined]
     cls._union = Union[tuple(variant_types)] if variant_types else None  # type: ignore[attr-defined]
 
     return cls

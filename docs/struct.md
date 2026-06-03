@@ -93,6 +93,54 @@ match User(id=1, name="Alice"):
         print(f"User #{id}: {name}")
 ```
 
+### Copy with Changes — `replace()`
+
+Frozen data needs an ergonomic way to produce a modified copy. `replace()` returns a **new** instance with the given fields overridden and all others copied across, re-running validation. The original is never mutated:
+
+```python
+from stolas.struct import struct, replace
+
+@struct
+class User:
+    id: int
+    name: str
+    active: bool = True
+
+u = User(id=1, name="Alice")
+
+replace(u, name="Bob")     # User(id=1, name='Bob', active=True)
+u.replace(name="Bob")      # method form — identical
+u                          # unchanged: User(id=1, name='Alice', active=True)
+
+replace(u, id="x")         # ❌ TypeError: re-validated, 'id' expects int
+replace(u, role="admin")   # ❌ TypeError: Unknown fields: {'role'}
+```
+
+> The free function `replace(instance, **changes)` is the fully type-checked entry point. The `.replace()` method is a convenience and is not installed when a field is literally named `replace`.
+
+### Serialization — `to_dict` / `from_dict` / JSON
+
+Structs convert to and from plain JSON-native data via `stolas.serde`. Conversion is **recursive** (nested structs, monads, `@cases` variants, containers) and **type-directed** on the way back:
+
+```python
+from stolas.serde import to_dict, from_dict, to_json, from_json
+
+@struct
+class User:
+    id: int
+    name: str
+
+u = User(id=1, name="Alice")
+
+to_dict(u)                                     # {'id': 1, 'name': 'Alice'}
+from_dict(User, {'id': 1, 'name': 'Alice'})    # User(id=1, name='Alice')
+
+to_json(u, indent=2)                           # JSON string (stdlib json)
+from_json(User, '{"id": 1, "name": "Alice"}')  # User(id=1, name='Alice')
+```
+
+Unknown keys are rejected (`TypeError`); missing keys fall back to field defaults. Nested fields recurse automatically. See **[Monadic Types](types.md)** for how monads and `@cases` variants serialize (the `__tag__` discriminator).
+
 ### Inheritance Blocked
 
 Structs cannot be subclassed:
@@ -234,8 +282,8 @@ interact(cat, dog)  # "Whiskers hisses at Rex"
 | Inheritance | ❌ Blocked | ✅ Subclassable | ⚠️ Limited |
 | Unpacking `a, b = x` | ❌ | ❌ | ✅ |
 | Index `x[0]` | ❌ | ❌ | ✅ |
-| `asdict()` | ❌ (manual) | ✅ | ✅ `_asdict()` |
-| `replace()` | ❌ (manual) | ✅ | ✅ `_replace()` |
+| `asdict()` / `to_dict()` | ✅ `stolas.serde` | ✅ | ✅ `_asdict()` |
+| `replace()` | ✅ | ✅ | ✅ `_replace()` |
 | IDE support | ⚠️ Partial | ✅ | ✅ |
 | Mypy support | ⚠️ Needs plugin | ✅ | ✅ |
 | Weakref | ❌ | ✅ | ❌ |

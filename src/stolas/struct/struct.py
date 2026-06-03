@@ -1,6 +1,9 @@
 """@struct: C/Rust-like immutable struct with fixed memory layout."""
 
-from typing import Any, TypeVar, cast, get_type_hints
+import types as _types
+from typing import Any, TypeVar, Union, cast, get_args, get_origin, get_type_hints
+
+from stolas.struct.replace import replace as _replace_fn
 
 T = TypeVar("T")
 
@@ -14,13 +17,64 @@ def _get_field_value(key: str, kwargs: dict[str, Any], defaults: dict[str, Any])
     raise TypeError(f"Missing required field: {key}")
 
 
-def _validate_type(key: str, value: Any, expected_type: type) -> None:
-    """Validate that value matches expected type."""
+def _type_name(expected_type: Any) -> str:
+    """Best-effort human name for a type or typing construct."""
+    return getattr(expected_type, "__name__", None) or str(expected_type)
+
+
+def _validate_type(key: str, value: Any, expected_type: Any) -> None:
+    """Validate that value matches expected type.
+
+    Handles plain classes, parameterized generics (shallow, e.g. ``list[int]``),
+    unions/optionals, and ``@cases`` union annotations (a value is valid if its
+    runtime type is a registered variant of the union).
+    """
     if expected_type is Any:
         return
-    if not isinstance(value, expected_type):
+
+    # @cases union annotation: accept any registered variant instance.
+    variant_names = getattr(expected_type, "_variant_names", None)
+    if variant_names is not None:
+        if type(value) in variant_names:
+            return
         raise TypeError(
-            f"Field '{key}' expects {expected_type.__name__}, got {type(value).__name__}"
+            f"Field '{key}' expects a {_type_name(expected_type)} variant, "
+            f"got {type(value).__name__}"
+        )
+
+    origin = get_origin(expected_type)
+
+    if origin is None:
+        if not isinstance(value, expected_type):
+            raise TypeError(
+                f"Field '{key}' expects {_type_name(expected_type)}, "
+                f"got {type(value).__name__}"
+            )
+        return
+
+    if origin is Union or origin is _types.UnionType:
+        for member in get_args(expected_type):
+            if member is type(None):
+                if value is None:
+                    return
+                continue
+            member_origin = get_origin(member)
+            check = member_origin if member_origin is not None else member
+            try:
+                if isinstance(value, check):
+                    return
+            except TypeError:  # pragma: no cover - members normalize to classes
+                continue
+        member_names = ", ".join(_type_name(m) for m in get_args(expected_type))
+        raise TypeError(
+            f"Field '{key}' expects {member_names}, got {type(value).__name__}"
+        )
+
+    # Parameterized generic (list[int], dict[str, int], tuple[int, ...], ...):
+    # shallow-check the container origin only.
+    if not isinstance(value, origin):
+        raise TypeError(
+            f"Field '{key}' expects {_type_name(origin)}, got {type(value).__name__}"
         )
 
 
@@ -118,32 +172,42 @@ def _make_init_subclass() -> Any:
     return classmethod(__init_subclass__)
 
 
+def _make_replace_method() -> Any:
+    """Create a `.replace(**changes)` method returning a modified copy."""
+
+    def replace(self: Any, **changes: Any) -> Any:
+        return _replace_fn(self, **changes)
+
+    return replace
+
+
 def struct(cls: type[T]) -> type[T]:
     """Decorator that creates an immutable struct with fixed memory layout."""
     annotations = get_type_hints(cls) if hasattr(cls, "__annotations__") else {}
     slots = tuple(annotations.keys())
     defaults = {k: getattr(cls, k) for k in slots if hasattr(cls, k)}
 
-    new_cls = cast(
-        type[T],
-        type(
-            cls.__name__,
-            (),
-            {
-                "__slots__": slots,
-                "__annotations__": annotations,
-                "__match_args__": slots,
-                "__init__": _make_init(slots, defaults, annotations),
-                "__setattr__": _make_setattr(),
-                "__delattr__": _make_delattr(),
-                "__repr__": _make_repr(cls.__name__, slots),
-                "__eq__": _make_eq(slots),
-                "__hash__": _make_hash(slots),
-                "__rshift__": _make_rshift(),
-                "__init_subclass__": _make_init_subclass(),
-                "__module__": cls.__module__,
-            },
-        ),
-    )
+    namespace: dict[str, Any] = {
+        "__slots__": slots,
+        "__annotations__": annotations,
+        "__match_args__": slots,
+        "__stolas_struct__": True,
+        "__stolas_fields__": tuple(annotations.items()),
+        "__init__": _make_init(slots, defaults, annotations),
+        "__setattr__": _make_setattr(),
+        "__delattr__": _make_delattr(),
+        "__repr__": _make_repr(cls.__name__, slots),
+        "__eq__": _make_eq(slots),
+        "__hash__": _make_hash(slots),
+        "__rshift__": _make_rshift(),
+        "__init_subclass__": _make_init_subclass(),
+        "__module__": cls.__module__,
+    }
+    # Only install the `.replace()` method when it would not shadow a field
+    # literally named ``replace``; the free function always works regardless.
+    if "replace" not in slots:
+        namespace["replace"] = _make_replace_method()
+
+    new_cls = cast(type[T], type(cls.__name__, (), namespace))
 
     return new_cls

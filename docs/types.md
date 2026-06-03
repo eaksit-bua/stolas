@@ -311,3 +311,40 @@ Result = Ok[T] | Error[E]
 Option = Some[T] | _Nothing
 Validated = Valid[T] | Invalid[E]
 ```
+
+---
+
+## Serialization
+
+Every monad converts to JSON-native data via `stolas.serde`, carrying a `__tag__`
+discriminator so the variant round-trips. Reconstruction is **target-directed** —
+you pass the type alias (or a parameterized one) to `from_dict`:
+
+```python
+from stolas.serde import to_dict, from_dict
+
+to_dict(Ok(5))            # {'__tag__': 'Ok', 'value': 5}
+to_dict(Error("boom"))    # {'__tag__': 'Error', 'error': 'boom'}
+to_dict(Some(7))          # {'__tag__': 'Some', 'value': 7}
+to_dict(Nothing)          # {'__tag__': 'Nothing'}
+to_dict(Valid(1))         # {'__tag__': 'Valid', 'value': 1}
+to_dict(Invalid(["e"]))   # {'__tag__': 'Invalid', 'errors': ['e']}
+to_dict(Many([1, 2]))     # {'__tag__': 'Many', 'items': [1, 2]}
+
+from_dict(Result, {'__tag__': 'Ok', 'value': 5})   # Ok(5)
+```
+
+**Parameterized targets** reconstruct inner elements — bare `Many` leaves items as
+raw data, so pass the element type when a collection holds structs or variants:
+
+```python
+from_dict(Many[User], to_dict(Many([User(id=1, name="A")])))  # Many([User(...)])
+```
+
+> **`Effect` is not serializable** — it wraps a deferred computation, so `to_dict`
+> raises `TypeError`. Run the effect and serialize its result instead.
+
+`@cases` variants serialize the same way: unit/value variants self-tag, while a
+struct/builtin aliased as a variant is tagged only inside a field declared as the
+union (the tag lives on the union, not the value). See **[Struct & Trait](struct.md)**
+and **[Operands](operands.md)**.

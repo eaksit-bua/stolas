@@ -86,11 +86,44 @@ Unit variants return themselves:
 PaymentStatus.Pending >> (lambda x: x * 2)  # PaymentStatus.Pending
 ```
 
+### Serialization
+
+Variants convert to JSON-native data via `stolas.serde` using a `__tag__` discriminator:
+
+```python
+from typing import Any
+from stolas.serde import to_dict, from_dict
+
+@cases
+class Box:
+    Item: Any      # value variant
+    Empty: None    # unit variant
+
+to_dict(Box.Item(7))   # {'__tag__': 'Item', 'value': 7}
+to_dict(Box.Empty)     # {'__tag__': 'Empty'}
+
+from_dict(Box, {'__tag__': 'Item', 'value': 7})   # Box.Item(7)
+```
+
+Serialization is **type-directed**: unit and value (`: Any`) wrappers self-tag standalone, while an existing-class/struct variant is bare on its own and is tagged only inside a field declared as the union — the tag lives on the union, not the value:
+
+```python
+@struct
+class Order:
+    status: PaymentStatus            # union-typed field
+
+to_dict(Order(status=...))           # {'status': {'__tag__': ..., 'value': ...}}
+```
+
+See **[Monadic Types](types.md#serialization)** for the full tag scheme.
+
 ### Internal API
 
 | Attribute | Description |
 |-----------|-------------|
 | `cls._variants` | Dict mapping variant names to their classes |
+| `cls._variant_names` | Reverse map (variant class → name), used by `stolas.serde` |
+| `cls._variant_kinds` | Map of variant name → kind: `unit` / `value` / `existing` |
 | `cls._union` | Union type of all variants |
 
 ---
