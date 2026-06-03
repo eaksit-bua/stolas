@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Validation** (`stolas.validation`): generic, composable field validators that return `Validated` (errors-as-values) and never raise. Primitives: `rule` (base hook), `matches` (regex), `length`, `between`, `min_val`, `max_val`, `non_empty`, `one_of`, plus `all_of` (accumulates all failures) and `any_of` (succeeds if any passes). Deliberately domain-agnostic — no `email`/`url`/`phone` built-ins; `rule`/`matches` are the documented hooks for such recipes.
+  - **`@struct` field validators**: opt-in `__validators__: dict[str, Validator]` runs after type checks during `__init__`, aggregating every value failure into a single `ValueError` (type errors still raise `TypeError` first). A struct without `__validators__` is byte-identical to before (zero overhead). `replace()` / `.replace()` / `from_dict()` re-run the validators.
 - **Monadic collection combinators** (`stolas.logic`): `sequence`, `traverse`, `partition`, and `combine_all` for working with collections of monads.
   - `sequence` / `traverse` dispatch on the element monad: fail-fast for `Result`/`Option`, error-accumulating (flat) for `Validated`, and lazy (a single `Effect`) for `Effect`. Empty collections require a `kind` string (`"result"`/`"option"`/`"validated"`/`"effect"`).
   - `partition` splits a `Many[Result]` into an order-preserving `(Many[oks], Many[errors])` tuple.

@@ -62,6 +62,32 @@ User(id=1, name="Alice", unknown=True)
 # ❌ TypeError: Unknown fields: {'unknown'}
 ```
 
+### Value Validation — `__validators__`
+
+Type checks confirm a field has the right *type*; to enforce a field's *value*
+(non-empty, in range, matching a pattern, ...), declare an opt-in class attribute
+`__validators__: dict[str, Validator]`. Type errors are still raised first; value
+failures are then aggregated into a single `ValueError`. A struct without
+`__validators__` is byte-identical to before (zero overhead):
+
+```python
+from stolas.validation import all_of, non_empty, between
+
+@struct
+class User:
+    id: int
+    name: str
+    __validators__ = {
+        "name": all_of(non_empty()),
+        "id": between(1, 9999),
+    }
+
+User(id=0, name="")   # ❌ ValueError: id: must be between 1 and 9999; name: must not be empty
+```
+
+See **[Validation](validation.md)** for the full validator library, the
+TypeError-then-ValueError ordering, and the email-via-`matches()` recipe.
+
 ### Auto-Generated Methods
 
 Every `@struct` automatically provides:

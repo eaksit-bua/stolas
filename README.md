@@ -77,6 +77,7 @@ For detailed documentation, see the **[docs/](docs/)** directory:
 - **[Monadic Types](docs/types.md)** - `Result`, `Option`, `Validated`, `Effect`, `Many`
 - **[Operands](docs/operands.md)** - Decorators `@cases`, the `as_*` safe combinators (`as_result`/`as_option`/`as_validated`/`as_many`/`as_effect`), and Concurrency
 - **[Logic Reference](docs/logic.md)** - Combinators and Placeholder (`_`)
+- **[Validation](docs/validation.md)** - Generic field validators (`rule`, `matches`, `all_of`, ...) and `@struct __validators__`
 
 ## 🦉 Testing
 
