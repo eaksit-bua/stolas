@@ -46,6 +46,14 @@ where = ["src"]
 # so installed users' type-checkers see stolas as a typed package.
 "*" = ["py.typed", "*.pyi"]
 
+[tool.mypy]
+# stolas is not installed in the venv (tests inject src on sys.path), so the
+# plugin module is referenced by file path (resolved relative to this config)
+# rather than by import name. mypy_path lets `import stolas...` resolve when the
+# gate is run as `mypy src/stolas --strict`.
+mypy_path = ["src"]
+plugins = ["src/stolas/mypy_plugin.py"]
+
 [tool.coverage.run]
 omit = ["src/stolas/mypy_plugin.py"]
 

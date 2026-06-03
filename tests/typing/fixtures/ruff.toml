@@ -1,0 +1,11 @@
+# Ruff config for the mypy typing FIXTURES only.
+#
+# These files are not real product/test code: they are inputs fed to a mypy
+# subprocess by tests/typing/test_typing_fixtures.py. They intentionally use
+# `reveal_type(...)` (which mypy understands but ruff flags as F821), bind
+# unused locals to pin static types (F841), and import names only for their
+# type effect (F401). Disabling those lint rules here keeps `ruff check .`
+# green without weakening linting anywhere else. (Nested ruff configs replace
+# the root config for files under this directory.)
+[lint]
+ignore = ["F821", "F841", "F401"]
