@@ -4,12 +4,16 @@ from stolas.logic.access import at, call, get
 from stolas.logic.collection import (
     apply,
     chain,
+    combine_all,
     count,
     find,
     first,
     last,
     pair,
+    partition,
+    sequence,
     sort,
+    traverse,
     where,
 )
 from stolas.logic.common import const, fmt, identity, tap, tee
@@ -33,6 +37,10 @@ __all__ = [
     "pair",
     "find",
     "sort",
+    "sequence",
+    "traverse",
+    "partition",
+    "combine_all",
     # Flow
     "check",
     "strict",
