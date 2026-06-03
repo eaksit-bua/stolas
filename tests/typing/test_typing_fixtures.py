@@ -140,6 +140,28 @@ def test_struct_pipe_replace_fixture_has_no_type_errors(tmp_path: object) -> Non
     assert is_clean(output)
 
 
+# --- @struct(open=True) keeps the plugin firing (Milestone 6.2) ---
+
+
+def test_open_struct_pipe_reveals_target_function_return_type(
+    tmp_path: object,
+) -> None:
+    output = run_mypy("struct_open.py", tmp_path)
+    assert reveal_types(output)[0] == "builtins.str"
+
+
+def test_open_struct_replace_reveals_the_struct_type(tmp_path: object) -> None:
+    output = run_mypy("struct_open.py", tmp_path)
+    assert reveal_types(output)[1] == "struct_open.Open"
+
+
+def test_open_struct_positional_construction_is_rejected_as_kw_only(
+    tmp_path: object,
+) -> None:
+    output = run_mypy("struct_open.py", tmp_path)
+    assert "Too many positional arguments" in output
+
+
 # --- @cases value-variant constructor typing (5.3) ---
 
 
@@ -242,6 +264,7 @@ def test_wrong_typed_struct_field_is_arg_type_error(tmp_path: object) -> None:
     "name",
     [
         "struct_pipe_replace.py",
+        "struct_open.py",
         "cases_constructor.py",
         "trait_dispatch.py",
         "placeholder_opaque.py",

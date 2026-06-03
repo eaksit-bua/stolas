@@ -25,7 +25,7 @@ from typing import Any, TypeVar, Union, get_args, get_origin
 from stolas.types import Effect, Error, Invalid, Many, Ok, Some, Valid
 from stolas.types.option import Nothing, _Nothing
 
-__all__ = ["to_dict", "from_dict", "to_json", "from_json"]
+__all__ = ["to_dict", "from_dict", "variant_from_dict", "to_json", "from_json"]
 
 _NO_MATCH: Any = object()
 
@@ -187,6 +187,40 @@ def _from_cases(union: Any, data: Any) -> Any:
     if kind == "value":
         return union._variants[name](from_dict(Any, data["value"]))
     return from_dict(union._variants[name], data["value"])
+
+
+def variant_from_dict(cls: Any, data: Any) -> Any:
+    """Reconstruct a single ``@cases`` variant instance from ``data``.
+
+    Complements :func:`from_dict`: use it when you already hold the concrete
+    variant class (e.g. ``Box.Item``) rather than the union. ``cls`` may be a
+    value-variant class, a unit variant (its class or its singleton instance),
+    or an existing-class variant (a ``@struct`` or builtin aliased as a variant).
+
+    The payload matches what :func:`to_dict` emits for a standalone variant:
+    ``{'__tag__': name, 'value': ...}`` for a value variant, ``{'__tag__': name}``
+    for a unit variant, and the bare encoding for an existing-class variant. A
+    present ``__tag__`` that names a different variant raises ``ValueError``.
+    """
+    variant = cls if isinstance(cls, type) else type(cls)
+    tag = getattr(variant, "__tag__", None)
+
+    if tag is None:
+        # Existing-class variant (a @struct/builtin aliased as a variant): the
+        # payload is the bare encoding, so reconstruct it directly.
+        return from_dict(variant, data)
+
+    if isinstance(data, dict) and "__tag__" in data and data["__tag__"] != tag:
+        raise ValueError(f"Tag {data['__tag__']!r} does not match variant {tag!r}")
+
+    if "_value" in getattr(variant, "__slots__", ()):
+        # Value variant: unwrap the tagged ``value`` payload.
+        if not (isinstance(data, dict) and "value" in data):
+            raise ValueError(f"Variant {tag!r} requires a 'value' field")
+        return variant(from_dict(Any, data["value"]))
+
+    # Unit variant: the singleton carries no payload.
+    return variant()
 
 
 def _from_monad(target: Any, data: Any) -> Any:

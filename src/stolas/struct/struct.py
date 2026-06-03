@@ -219,8 +219,15 @@ def _make_replace_method() -> Any:
     return replace
 
 
-def struct(cls: type[T]) -> type[T]:
-    """Decorator that creates an immutable struct with fixed memory layout."""
+def _build_struct(cls: type[T], *, open: bool) -> type[T]:
+    """Build the immutable struct class from ``cls``.
+
+    ``open`` controls only one thing: whether the inheritance-blocking
+    ``__init_subclass__`` is installed. With ``open=False`` (the default) the
+    generated namespace is byte-identical to the historical ``@struct`` output;
+    with ``open=True`` the block is omitted so subclasses may be declared while
+    the base struct itself stays frozen and ``__slots__``-only.
+    """
     annotations = get_type_hints(cls) if hasattr(cls, "__annotations__") else {}
     slots = tuple(annotations.keys())
     defaults = {k: getattr(cls, k) for k in slots if hasattr(cls, k)}
@@ -242,6 +249,10 @@ def struct(cls: type[T]) -> type[T]:
         "__init_subclass__": _make_init_subclass(),
         "__module__": cls.__module__,
     }
+    # open=True opts in to subclassing: drop the inheritance guard. The default
+    # (open=False) keeps the guard so the namespace stays byte-identical.
+    if open:
+        del namespace["__init_subclass__"]
     # Only install the `.replace()` method when it would not shadow a field
     # literally named ``replace``; the free function always works regardless.
     if "replace" not in slots:
@@ -255,3 +266,22 @@ def struct(cls: type[T]) -> type[T]:
     new_cls = cast(type[T], type(cls.__name__, (), namespace))
 
     return new_cls
+
+
+def struct(cls: type[T] | None = None, *, open: bool = False) -> Any:
+    """Decorator that creates an immutable struct with fixed memory layout.
+
+    Dual-form: use bare as ``@struct`` (the default, ``open=False``) or called
+    as ``@struct(open=True)``. ``open=False`` is byte-identical to the historical
+    behavior -- frozen, ``__slots__``-only, and not subclassable. ``open=True``
+    opts in to allowing subclasses (the inheritance guard is not installed) while
+    the base struct itself stays immutable.
+    """
+    if cls is None:
+        # Call form: @struct(open=...) -> return a decorator.
+        def decorator(inner: type[T]) -> type[T]:
+            return _build_struct(inner, open=open)
+
+        return decorator
+    # Bare form: @struct.
+    return _build_struct(cls, open=open)
