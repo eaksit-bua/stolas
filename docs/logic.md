@@ -50,11 +50,19 @@ _[0]             # lambda x: x[0]
 
 ### Method Calls
 
+Method calls work only when reached **through** an attribute (or item) access — that
+is, `_.attr.method(...)`. They model `lambda x: x.attr.method(...)`:
+
 ```python
-_.lower()                # lambda x: x.lower()
-_.split(",")             # lambda x: x.split(",")
-_.replace("a", "b")      # lambda x: x.replace("a", "b")
+_.name.lower()           # lambda x: x.name.lower()
+_.name.split(",")        # lambda x: x.name.split(",")
+_.name.replace("a", "b") # lambda x: x.name.replace("a", "b")
 ```
+
+> **Note:** A bare method call on the raw placeholder — `_.upper()`, or
+> `apply(_.upper())` — is **not** supported and raises `TypeError` at call time.
+> Reach for `_.attr.method()` instead, or use the explicit
+> [`call(method, ...)`](#callmethod-args-kwargs) combinator for `lambda x: x.method()`.
 
 ### Chaining
 
@@ -224,6 +232,108 @@ from stolas.logic import pair
 
 Many([1, 2, 3]) >> pair(Many(['a', 'b', 'c']))
 # Many([(1, 'a'), (2, 'b'), (3, 'c')])
+```
+
+---
+
+## Monadic Collection Combinators
+
+These combinators turn a `Many` *of monads* (or a `Many` you map into monads)
+into a single monad, and back again. They dispatch on the **element** monad and
+adapt their effect strategy accordingly:
+
+- **Result / Option** — fail-fast: the first `Error`/`Nothing` wins and short-circuits.
+- **Validated** — accumulating: every error is collected and concatenated *flat*.
+- **Effect** — lazy: you get back **one** `Effect` that collects the results when you `.run()` it.
+
+For an empty `Many`, the success-of-empty is ambiguous, so you must say which
+monad you mean via the `kind` argument — a **string** that is one of
+`"result"`, `"option"`, `"validated"`, or `"effect"`. Omitting `kind` on an
+empty `Many` raises `ValueError`. Heterogeneous or non-monad elements also raise
+`ValueError`.
+
+### `sequence(kind=None)`
+
+Turn `Many[M[T]]` into `M[Many[T]]`, dispatching on the elements' monad.
+
+```python
+from stolas.logic import sequence
+from stolas.types import Many, Ok, Error
+
+Many([Ok(1), Ok(2)]) >> sequence()
+# Ok(Many([1, 2]))
+
+Many([Ok(1), Error("x")]) >> sequence()    # fail-fast: first Error wins
+# Error("x")
+
+# Empty Many needs an explicit kind to pick the monad:
+Many([]) >> sequence("result")
+# Ok(Many([]))
+```
+
+With `Validated` elements the errors accumulate flat instead of short-circuiting:
+
+```python
+from stolas.types import Valid, Invalid
+
+Many([Valid(1), Invalid(["a"]), Invalid(["b"])]) >> sequence()
+# Invalid(["a", "b"])
+```
+
+With `Effect` elements you get a single lazy `Effect`:
+
+```python
+from stolas.types import Effect
+
+eff = Many([Effect(lambda: 1), Effect(lambda: 2)]) >> sequence()
+eff.run()
+# Many([1, 2])
+```
+
+### `traverse(func, kind=None)`
+
+Map `func: T -> M[U]` over a `Many[T]`, then `sequence` the results. For
+`Result`/`Option` this short-circuits — `func` is **not** called past the first
+failure; `Validated` calls `func` on every element; `Effect` stays lazy. The
+same empty-`Many`/`kind`/`ValueError` rules as `sequence` apply.
+
+```python
+from stolas.logic import traverse
+from stolas.types import Many, Ok
+
+Many([1, 2, 3]) >> traverse(lambda n: Ok(n * 2))
+# Ok(Many([2, 4, 6]))
+```
+
+### `partition()`
+
+Split a `Many[Result[T, E]]` into a plain 2-tuple `(Many[oks], Many[errors])`,
+preserving order. A non-`Result` element raises `ValueError`.
+
+```python
+from stolas.logic import partition
+from stolas.types import Many, Ok, Error
+
+Many([Ok(1), Error("e"), Ok(2)]) >> partition()
+# (Many([1, 2]), Many(["e"]))
+```
+
+### `combine_all(*vs)`
+
+Combine `Validated` values: if all are `Valid`, returns a **flat**
+`Valid(tuple(values))`; if any is `Invalid`, returns an `Invalid` with all
+errors concatenated flat. With no arguments returns `Valid(())`. A
+non-`Validated` argument raises `ValueError`.
+
+```python
+from stolas.logic import combine_all
+from stolas.types import Valid, Invalid
+
+combine_all(Valid(1), Valid(2), Valid(3))
+# Valid((1, 2, 3))
+
+combine_all(Valid(1), Invalid(["a"]), Invalid(["b"]))
+# Invalid(["a", "b"])
 ```
 
 ---
@@ -424,6 +534,7 @@ is_zero_or_ten(5)   # False
 |----------|-----------|
 | **Access** | `get`, `at`, `call` |
 | **Collection** | `where`, `apply`, `chain`, `first`, `last`, `count`, `find`, `sort`, `pair` |
+| **Monadic Collection** | `sequence`, `traverse`, `partition`, `combine_all` |
 | **Flow** | `check`, `strict` |
 | **Utilities** | `identity`, `const`, `tap`, `tee`, `fmt`, `wrap`, `when`, `compose`, `alt` |
 | **Predicates** | `contains`, `negate`, `both`, `either` |
@@ -438,7 +549,8 @@ is_zero_or_ten(5)   # False
 | `lambda x: x.name` | `_.name` | Placeholder |
 | `lambda x: x["key"]` | `_["key"]` | Placeholder |
 | `lambda x: x > 5` | `_ > 5` | Placeholder |
-| `lambda x: x.upper()` | `_.upper()` | Placeholder |
+| `lambda x: x.name.upper()` | `_.name.upper()` | Placeholder |
+| `lambda x: x.upper()` (bare) | `call("upper")` (`_.upper()` is unsupported) | Access |
 | `lambda x: getattr(x, "name")` | `get("name")` | Access |
 | `lambda x: x["id"]` | `at("id")` | Access |
 | `lambda x: x[0]` | `at(0)` | Access |
