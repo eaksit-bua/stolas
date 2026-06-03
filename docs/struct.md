@@ -177,6 +177,76 @@ class Admin(User):  # ❌ TypeError: Cannot inherit from struct
     role: str
 ```
 
+This is the **default** (`open=False`). The generated class installs an
+`__init_subclass__` guard that raises on any subclass. To opt out, see
+`@struct(open=True)` below.
+
+### `@struct(open=True)` — opting in to subclassing
+
+`@struct` is a **dual-form** decorator: use it bare as `@struct` (the default,
+`open=False`) or called as `@struct(open=True)`. The call form relaxes **exactly
+one thing** — the inheritance guard — so subclasses are permitted:
+
+```python
+from stolas.struct import struct
+
+@struct(open=True)
+class Base:
+    id: int
+
+class Tagged(Base):     # ✅ permitted — no "Cannot inherit from struct"
+    pass
+```
+
+What `open=True` does **not** change: the base struct stays frozen,
+`__slots__`-only, runtime-type-checked at construction, and keeps every
+auto-generated method (`__repr__`, `__eq__`, `__hash__`, `>>`, `.replace()`,
+`__match_args__`). The base itself is still immutable:
+
+```python
+b = Base(id=1)
+b.id = 2     # ❌ AttributeError: Struct is immutable
+```
+
+`open=False` (bare `@struct`) is **byte-identical** to the historical behavior —
+same generated namespace, same repr / eq / hash / slots, same inheritance block.
+You pay nothing for the feature unless you opt in.
+
+The bundled **mypy plugin still fires** for the call form: `@struct(open=True)`
+resolves to the same callee the plugin already matches, so `instance >> func` and
+`.replace()` stay precisely typed on open structs too, and a positional argument to
+an open struct's constructor is still a mypy error. See
+**[Typing Model](typing.md#the-mypy-plugin)**.
+
+> [!CAUTION]
+> **Soundness gap: a mutable subclass vs. the frozen stub.** `open=True` only
+> *permits* subclassing — it cannot police what a subclass does. A subclass can
+> override `__setattr__` (or otherwise reintroduce state) and become mutable, even
+> though the `dataclass_transform(frozen_default=True)` stub still types the whole
+> hierarchy as frozen:
+>
+> ```python
+> @struct(open=True)
+> class Base:
+>     id: int
+>
+> class Mutable(Base):
+>     def __setattr__(self, k, v):       # subclass re-opens mutation
+>         object.__setattr__(self, k, v)
+>
+> m = Mutable(id=1)
+> m.id = 99      # mutates — but the type checker still believes it is frozen
+> ```
+>
+> Stolas does **not** close this gap (it is documented, not solved): the frozen
+> guarantee is enforced on the base, not inherited-and-checked on subclasses.
+> Treat open structs as data carriers for interop, not as a license to make
+> mutable subclasses. If you need a truly frozen type, keep the default closed
+> `@struct`.
+
+For why you might need an open struct (subclassing a framework/ORM base) and the
+full interop story, see **[Interop](interop.md#structopentrue--opting-in-to-subclassing)**.
+
 ---
 
 ## @trait
@@ -305,7 +375,7 @@ interact(cat, dog)  # "Whiskers hisses at Rex"
 | Immutable | ✅ Always | ✅ Frozen | ✅ Always |
 | Runtime type check | ✅ | ❌ | ❌ |
 | Extra fields blocked | ✅ | ❌ | ✅ |
-| Inheritance | ❌ Blocked | ✅ Subclassable | ⚠️ Limited |
+| Inheritance | ❌ Blocked (opt in via `open=True`) | ✅ Subclassable | ⚠️ Limited |
 | Unpacking `a, b = x` | ❌ | ❌ | ✅ |
 | Index `x[0]` | ❌ | ❌ | ✅ |
 | `asdict()` / `to_dict()` | ✅ `stolas.serde` | ✅ | ✅ `_asdict()` |

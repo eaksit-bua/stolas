@@ -79,6 +79,7 @@ For detailed documentation, see the **[docs/](docs/)** directory:
 - **[Operands](docs/operands.md)** - Decorators `@cases`, the `as_*` safe combinators (`as_result`/`as_option`/`as_validated`/`as_many`/`as_effect`), and Concurrency
 - **[Logic Reference](docs/logic.md)** - Combinators and Placeholder (`_`)
 - **[Validation](docs/validation.md)** - Generic field validators (`rule`, `matches`, `all_of`, ...) and `@struct __validators__`
+- **[Interop](docs/interop.md)** - Zero-dependency interop with pydantic / SQLAlchemy / msgspec via `stolas.serde`, `variant_from_dict`, and `@struct(open=True)`
 - **[Typing Model](docs/typing.md)** - What is precisely typed, what is intentionally opaque, the bundled mypy plugin, and how to enable it in your own config
 
 ## 🦉 Testing
