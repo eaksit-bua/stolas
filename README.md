@@ -74,7 +74,8 @@ divide(10)(0)  # Error(ZeroDivisionError(...))
 For detailed documentation, see the **[docs/](docs/)** directory:
 
 - **[Struct & Trait](docs/struct.md)** - Polymorphism (`@trait`) and immutable data (`@struct`)
-- **[Monadic Types](docs/types.md)** - `Result`, `Option`, `Validated`, `Effect`, `Many`
+- **[Monadic Types](docs/types.md)** - `Result`, `Option`, `Validated`, `Effect`, `AsyncEffect`, `Many`
+- **[Control](docs/control.md)** - Effectful flow combinators: `bracket`, `RetryPolicy`/`retry`, and `timeout`
 - **[Operands](docs/operands.md)** - Decorators `@cases`, the `as_*` safe combinators (`as_result`/`as_option`/`as_validated`/`as_many`/`as_effect`), and Concurrency
 - **[Logic Reference](docs/logic.md)** - Combinators and Placeholder (`_`)
 - **[Validation](docs/validation.md)** - Generic field validators (`rule`, `matches`, `all_of`, ...) and `@struct __validators__`
@@ -89,7 +90,7 @@ python -m pytest tests/
 mypy src/stolas --strict
 ```
 
-**Status:** 🦉 892 tests passing • 100% coverage • 100% mypy strict compliance
+**Status:** 🦉 1043 tests passing • 100% coverage • 100% mypy strict compliance
 
 ## 🦉 License
 

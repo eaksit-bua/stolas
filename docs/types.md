@@ -260,6 +260,8 @@ eff = Effect.pure(42)
 | `run()` | `-> T` | Execute the effect and return result |
 | `map(func)` | `Callable[[T], U] -> Effect[U]` | Transform eventual result (lazy) |
 | `bind(func)` | `Callable[[T], Effect[U]] -> Effect[U]` | Chain effects (lazy, flattening) |
+| `as_result()` | `-> Effect[Result[T, Exception]]` | Wrap so `.run()` yields `Ok`/`Error` (errors-as-values) |
+| `to_async()` | `-> AsyncEffect[T]` | Lift into an `AsyncEffect` (see [Bridges](#bridging-effect-and-asynceffect)) |
 
 ### Static Methods
 
@@ -267,6 +269,7 @@ eff = Effect.pure(42)
 |--------|-----------|-------------|
 | `Effect.pure(value)` | `T -> Effect[T]` | Wrap pure value in Effect |
 | `Effect.defer(func, *args, **kwargs)` | `-> Effect[T]` | Create Effect from function call |
+| `Effect.attempt(thunk)` | `Callable[[], T] -> Effect[Result[T, Exception]]` | Run `thunk`, capturing failure as a value |
 
 ### Lazy Execution
 
@@ -298,6 +301,227 @@ data = pipeline.run()  # Now reads and parses
 Effect.pure(10) >> (lambda x: x * 2)
 # Effect that will return 20 when run
 ```
+
+### Capturing Failure as a Value: `attempt` / `as_result`
+
+An `Effect` normally lets exceptions escape from `.run()`. To stay in the
+errors-as-values world, wrap it so a raised `Exception` becomes an `Error` and a
+return value becomes an `Ok`:
+
+```python
+from stolas.types import Effect
+
+# Effect.attempt(thunk): run a fresh thunk, capturing failure.
+Effect.attempt(lambda: 21 * 2).run()    # Ok(42)
+Effect.attempt(lambda: 10 // 0).run()   # Error(ZeroDivisionError('integer division or modulo by zero'))
+
+# .as_result(): wrap an existing Effect the same way.
+Effect.defer(int, "42").as_result().run()    # Ok(42)
+Effect.defer(int, "nope").as_result().run()
+# Error(ValueError("invalid literal for int() with base 10: 'nope'"))
+```
+
+`Effect.attempt(thunk)` is exactly `Effect(thunk).as_result()`. Both catch
+**`Exception` only** — `BaseException` (e.g. `KeyboardInterrupt`, `SystemExit`)
+propagates, so a deliberate interrupt is never swallowed.
+
+---
+
+## AsyncEffect[T]
+
+`AsyncEffect` is the **async sibling** of `Effect` — for deferred work driven by
+native `async`/`await`. It is a separate class, not a mode of `Effect`: there is
+no free-monad interpreter, just `await`. Instead of a synchronous thunk it wraps a
+**factory** that returns a *fresh awaitable on every run*, so the same
+`AsyncEffect` can be `.run()` more than once.
+
+### Import
+
+```python
+from stolas.types import AsyncEffect
+```
+
+### Creating AsyncEffects
+
+```python
+import asyncio
+
+async def fetch() -> int:
+    return 5
+
+# Wrap a factory (a zero-arg callable returning an awaitable):
+eff = AsyncEffect(fetch)
+
+# Defer a coroutine function call:
+eff = AsyncEffect.defer(fetch)
+
+# Wrap a pure value:
+eff = AsyncEffect.pure(42)
+```
+
+### AsyncEffect[T] Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `factory` | `@property -> Callable[[], Awaitable[T]]` | Access the wrapped factory |
+| `run()` | `async -> T` | Await a **fresh** awaitable from the factory |
+| `map(func)` | `Callable[[T], U] -> AsyncEffect[U]` | Transform eventual result (lazy) |
+| `bind(func)` | `Callable[[T], AsyncEffect[U]] -> AsyncEffect[U]` | Chain async effects (lazy, flattening) |
+| `as_result()` | `-> AsyncEffect[Result[T, Exception]]` | Wrap so `.run()` yields `Ok`/`Error` |
+
+### Static Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `AsyncEffect.pure(value)` | `T -> AsyncEffect[T]` | Wrap a pure value |
+| `AsyncEffect.defer(coro_fn, *args, **kwargs)` | `-> AsyncEffect[T]` | Create from a coroutine function call |
+| `AsyncEffect.attempt(coro_fn, *args, **kwargs)` | `-> AsyncEffect[Result[T, Exception]]` | Await `coro_fn(...)`, capturing failure as a value |
+
+### Running and Composing
+
+`.run()` is a coroutine — `await` it (or drive it with `asyncio.run`). Nothing
+executes until then, and `map` / `bind` / `>>` compose **without running**:
+
+```python
+import asyncio
+from stolas.types import AsyncEffect
+
+async def fetch() -> int:
+    return 5
+
+eff = AsyncEffect(fetch)
+
+asyncio.run(eff.run())                                  # 5
+asyncio.run(eff.map(lambda x: x + 1).run())             # 6
+asyncio.run(eff.bind(lambda x: AsyncEffect.pure(x * 10)).run())  # 50
+asyncio.run((eff >> (lambda x: x * 100)).run())         # 500
+```
+
+### Fresh Awaitable Per Run
+
+A bare coroutine can only be awaited once, so `AsyncEffect` stores a **factory**
+and asks it for a new awaitable on each `.run()`. The same effect is therefore
+re-runnable:
+
+```python
+import asyncio
+from stolas.types import AsyncEffect
+
+async def gen() -> int:
+    return 1
+
+eff = AsyncEffect(gen)
+asyncio.run(eff.run())   # 1
+asyncio.run(eff.run())   # 1 (a fresh awaitable, not a reused, exhausted one)
+```
+
+### Capturing Failure as a Value
+
+`attempt` / `as_result` mirror their `Effect` counterparts:
+
+```python
+import asyncio
+from stolas.types import AsyncEffect
+
+async def add(a: int, b: int) -> int:
+    return a + b
+
+async def boom() -> int:
+    raise ValueError("nope")
+
+asyncio.run(AsyncEffect.attempt(add, 1, 2).run())   # Ok(3)
+asyncio.run(AsyncEffect.attempt(boom).run())        # Error(ValueError('nope'))
+asyncio.run(AsyncEffect.defer(boom).as_result().run())  # Error(ValueError('nope'))
+```
+
+These catch **`Exception` only**. In particular `asyncio.CancelledError` is a
+`BaseException` and is **never** captured — it always propagates, so cancellation
+still tears the task down as expected:
+
+```python
+import asyncio
+from stolas.types import AsyncEffect
+
+async def cancelled() -> int:
+    raise asyncio.CancelledError()
+
+async def main() -> str:
+    try:
+        await AsyncEffect.defer(cancelled).as_result().run()
+    except asyncio.CancelledError:
+        return "propagated"
+    return "swallowed"
+
+asyncio.run(main())   # 'propagated'
+```
+
+---
+
+## Bridging `Effect` and `AsyncEffect`
+
+Three bridges connect the synchronous and asynchronous worlds.
+
+### Import
+
+```python
+from stolas.types import from_effect, to_effect
+# plus the Effect.to_async() method
+```
+
+### `Effect.to_async()` / `from_effect(effect)` — sync → async
+
+Both lift a synchronous `Effect` into an `AsyncEffect` (running the original thunk
+inside an `async` factory). `from_effect(effect)` is the module-level form of
+`effect.to_async()`:
+
+```python
+import asyncio
+from stolas.types import Effect, from_effect
+
+ae = Effect.pure(7).to_async()
+asyncio.run(ae.run())             # 7
+
+ae = from_effect(Effect.pure(42))
+asyncio.run(ae.run())             # 42
+```
+
+### `to_effect(ae)` — async → sync
+
+`to_effect(ae)` returns an `Effect` whose `.run()` drives the awaitable to
+completion via `asyncio.run`:
+
+```python
+from stolas.types import AsyncEffect, to_effect
+
+eff = to_effect(AsyncEffect.pure(8))
+eff.run()   # 8
+```
+
+> [!CAUTION]
+> **`to_effect` cannot run inside an already-running event loop.** Because it calls
+> `asyncio.run` internally, invoking the returned effect's `.run()` from within a
+> running loop raises a clear `RuntimeError`. When you are already inside `async`
+> code, `await` the `AsyncEffect` directly (`await ae.run()`) instead of bridging
+> back to a sync `Effect`.
+>
+> ```python
+> import asyncio
+> from stolas.types import AsyncEffect, to_effect
+>
+> async def main() -> str:
+>     try:
+>         to_effect(AsyncEffect.pure(1)).run()   # inside a running loop
+>     except RuntimeError as exc:
+>         return str(exc)
+>     return "ran"
+>
+> asyncio.run(main())
+> # 'to_effect cannot run inside a running event loop; await the AsyncEffect
+> #  directly (e.g. `await ae.run()`) instead.'
+> ```
+
+See **[Control](control.md)** for `bracket` / `retry` / `timeout` built on these
+two effect types.
 
 ---
 
