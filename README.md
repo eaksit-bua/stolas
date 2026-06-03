@@ -92,7 +92,7 @@ python -m pytest tests/
 mypy src/stolas --strict
 ```
 
-**Status:** 🦉 1043 tests passing • 100% coverage • `mypy --strict`-clean core + bundled plugin (the `_` placeholder and dual-mode `>>` are intentionally opaque — see **[Typing Model](docs/typing.md)**)
+**Status:** 🦉 1113 tests passing • 100% coverage • `mypy --strict`-clean core + bundled plugin (the `_` placeholder and dual-mode `>>` are intentionally opaque — see **[Typing Model](docs/typing.md)**)
 
 ## 🦉 License
 

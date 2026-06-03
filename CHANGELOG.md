@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-06-03
 
 ### Added
 - **`@struct(open=True)`** (`stolas.struct`): `@struct` is now a **dual-form** decorator — usable bare as `@struct` (the default, `open=False`) or called as `@struct(open=True)`. The call form relaxes **only** the inheritance guard, so subclasses are permitted; the base struct stays frozen, `__slots__`-only, runtime-type-checked, and keeps `>>` / `.replace()`. `open=False` is byte-identical to the historical behavior (same generated namespace, repr/eq/hash/slots, and `__init_subclass__` block). The bundled mypy plugin still fires for the call form, so `>>` and `.replace()` stay typed on open structs. Documented soundness caveat: a subclass can reintroduce mutability while the frozen stub still types it as immutable (the gap is documented, not solved). See **[Struct & Trait](docs/struct.md)** and **[Interop](docs/interop.md)**.
