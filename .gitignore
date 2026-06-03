@@ -167,5 +167,35 @@ cython_debug/
 
 # Agent plans
 .plan/
-.claude
+
+# PyPI credentials
 .pypirc
+
+# AI assistants, agents & tooling
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.claude/
+.claude.json
+.mcp.json
+.anthropic/
+.cursor/
+.cursorrules
+.cursorignore
+.cursorindexingignore
+.aider*
+.windsurf/
+.windsurfrules
+.continue/
+.codeium/
+.cody/
+.clinerules
+.cline/
+.roo/
+.roomodes
+.gemini/
+.codex/
+.tabnine/
+.github/copilot-instructions.md
+graphify-out/

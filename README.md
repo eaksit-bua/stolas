@@ -58,8 +58,8 @@ def divide(a: int, b: int) -> float:
 
 # Functional pipelines with placeholder
 users = Many([
-    User(1, "Alice", "alice@example.com"),
-    User(2, "Bob", "bob@example.com"),
+    User(id=1, name="Alice", email="alice@example.com"),
+    User(id=2, name="Bob", email="bob@example.com"),
 ])
 
 result = users >> where(_.id > 1) >> apply(_.name)  # Many(["Bob"])
@@ -75,7 +75,7 @@ For detailed documentation, see the **[docs/](docs/)** directory:
 
 - **[Struct & Trait](docs/struct.md)** - Polymorphism (`@trait`) and immutable data (`@struct`)
 - **[Monadic Types](docs/types.md)** - `Result`, `Option`, `Validated`, `Effect`, `Many`
-- **[Operands](docs/operands.md)** - Decorators `@cases`, `@safe`, and Concurrency
+- **[Operands](docs/operands.md)** - Decorators `@cases`, the `as_*` safe combinators (`as_result`/`as_option`/`as_validated`/`as_many`/`as_effect`), and Concurrency
 - **[Logic Reference](docs/logic.md)** - Combinators and Placeholder (`_`)
 
 ## 🦉 Testing
@@ -88,7 +88,7 @@ python -m pytest tests/
 mypy src/stolas --strict
 ```
 
-**Status:** 🦉 741 tests passing • 100% coverage • 100% mypy strict compliance
+**Status:** 🦉 892 tests passing • 100% coverage • 100% mypy strict compliance
 
 ## 🦉 License
 

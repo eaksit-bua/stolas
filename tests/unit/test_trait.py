@@ -96,6 +96,7 @@ class TestTraitMultiTarget:
 
     def test_impl_with_separate_registrations(self) -> None:
         """Separate impl() calls for different types."""
+
         @trait
         def area(shape: Any) -> int:
             pass
@@ -113,6 +114,7 @@ class TestTraitMultiTarget:
 
     def test_impl_with_union_type(self) -> None:
         """Union type registers same impl for all types in union."""
+
         @trait
         def stringify(x: Any) -> str:
             pass
@@ -127,6 +129,7 @@ class TestTraitMultiTarget:
 
     def test_union_types_in_types_property(self) -> None:
         """Union types are unwrapped and all appear in .types property."""
+
         @trait
         def process(x: Any) -> str:
             pass
@@ -157,7 +160,9 @@ class TestTraitMultiDispatch:
             return f"{cat.name} hisses at {dog.name}"
 
         assert interact(Dog(name="Rex"), Cat(name="Whiskers")) == "Rex chases Whiskers"
-        assert interact(Cat(name="Whiskers"), Dog(name="Rex")) == "Whiskers hisses at Rex"
+        assert (
+            interact(Cat(name="Whiskers"), Dog(name="Rex")) == "Whiskers hisses at Rex"
+        )
 
     def test_dispatch_on_three_arguments(self) -> None:
         @trait

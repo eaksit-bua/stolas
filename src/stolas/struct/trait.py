@@ -12,7 +12,10 @@ def _unwrap_types(types_: tuple[type, ...]) -> tuple[type, ...]:
         # Handle @cases ADTs which have a _union attribute
         if hasattr(t, "_union"):
             union_type = getattr(t, "_union")
-            if get_origin(union_type) is Union or get_origin(union_type) is types.UnionType:
+            if (
+                get_origin(union_type) is Union
+                or get_origin(union_type) is types.UnionType
+            ):
                 result.extend(get_args(union_type))
                 continue
 
@@ -110,9 +113,7 @@ class TraitDispatcher:
         self._registry_multi: dict[tuple[type, ...], Callable[..., Any]] = {}
         self._cache_multi: dict[tuple[type, ...], Callable[..., Any]] = {}
 
-    def impl(
-        self, *types_: type
-    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def impl(self, *types_: type) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register implementation for specific types.
 
         Single dispatch (use union for multiple types):
