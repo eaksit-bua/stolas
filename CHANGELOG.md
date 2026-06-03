@@ -24,12 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `@cases` serialization is **type-directed**: a `__tag__` discriminator is emitted on union-typed positions (the union owns the tag, Rust-`serde` style), while unit/value variant wrappers self-tag.
   - `from_dict` honours parameterized targets, e.g. `from_dict(Many[User], data)` reconstructs each element.
   - `Effect` is intentionally not serializable (`to_dict` raises `TypeError`).
+- **Registered the bundled mypy plugin** (`stolas.mypy_plugin`) via a `[tool.mypy]` section in `pyproject.toml`, so type-checking now sees `@struct` and `@cases` correctly. The plugin injects, onto every `@struct`-decorated class, a precise `instance >> func` operator (typed as the return of `func`) and a `.replace(**changes) -> Self` method, and makes `@cases` variant constructors callable. It adds no strictness-loosening options — `mypy src/stolas --strict` stays clean with the plugin active. Consumers enable it with `plugins = ["stolas.mypy_plugin"]` in their own mypy config (see the new typing docs).
+- **Typing documentation** (`docs/typing.md`): an honest map of what is precisely typed, what is intentionally opaque (the `_` placeholder and the dual-mode `Many.__rshift__`), what the mypy plugin does for `@struct`/`@cases`, how a consumer enables the plugin, the `dataclass_transform` story for `@struct`, the typed `.replace()`, and the full `>>` typing matrix. Cross-linked from the README docs list.
 
 ### Fixed
 - `@struct` field validation no longer crashes on parameterized generic annotations (`list[int]`, `dict[str, int]`, `tuple[int, str]`). It now does a shallow container check and additionally supports union/optional and `@cases`-union field types.
 
 ### Changed
 - `@cases` now records `_variant_names` / `_variant_kinds`, and a `__tag__` on unit/value variant wrappers, to support type-directed serialization.
+- **Re-scoped the strictness claim** in the README from "100% mypy strict compliance" to "`mypy --strict`-clean core + bundled plugin", with the `_` placeholder and dual-mode `>>` called out as intentionally opaque. The wording now matches how the library actually types itself rather than over-promising.
 
 ---
 

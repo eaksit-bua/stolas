@@ -28,7 +28,7 @@ Ergonomic functional combinators: `get`, `at`, `where`, `apply`, `_` placeholder
 - ✅ **Functional Composition**: Pipeline chaining with `>>`
 - ✅ **Async Concurrency**: Parallel workflows with `concurrent()`
 - ✅ **Polymorphism**: Trait-based dispatch for decoupled behavior
-- ✅ **Type Safety**: Full `mypy --strict` compatibility
+- ✅ **Type Safety**: `mypy --strict`-clean core, plus a bundled mypy plugin for `@struct`/`@cases` (see **[Typing Model](docs/typing.md)**)
 
 ## 🦉 Installation
 
@@ -79,6 +79,7 @@ For detailed documentation, see the **[docs/](docs/)** directory:
 - **[Operands](docs/operands.md)** - Decorators `@cases`, the `as_*` safe combinators (`as_result`/`as_option`/`as_validated`/`as_many`/`as_effect`), and Concurrency
 - **[Logic Reference](docs/logic.md)** - Combinators and Placeholder (`_`)
 - **[Validation](docs/validation.md)** - Generic field validators (`rule`, `matches`, `all_of`, ...) and `@struct __validators__`
+- **[Typing Model](docs/typing.md)** - What is precisely typed, what is intentionally opaque, the bundled mypy plugin, and how to enable it in your own config
 
 ## 🦉 Testing
 
@@ -90,7 +91,7 @@ python -m pytest tests/
 mypy src/stolas --strict
 ```
 
-**Status:** 🦉 1043 tests passing • 100% coverage • 100% mypy strict compliance
+**Status:** 🦉 1043 tests passing • 100% coverage • `mypy --strict`-clean core + bundled plugin (the `_` placeholder and dual-mode `>>` are intentionally opaque — see **[Typing Model](docs/typing.md)**)
 
 ## 🦉 License
 
