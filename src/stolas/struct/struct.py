@@ -1,9 +1,19 @@
 """@struct: C/Rust-like immutable struct with fixed memory layout."""
 
 import types as _types
-from typing import Any, TypeVar, Union, cast, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Callable,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from stolas.struct.replace import replace as _replace_fn
+from stolas.types.validated import Invalid
 
 T = TypeVar("T")
 
@@ -91,8 +101,34 @@ def _validate_fields(
         raise TypeError(f"Missing required fields: {missing}")
 
 
+def _validate_values(
+    self: Any,
+    slots: tuple[str, ...],
+    validators: dict[str, Callable[[Any], Any]],
+) -> None:
+    """Run opt-in field validators, aggregating every failure into one error.
+
+    Each validator returns a ``Validated``; ``Invalid`` results contribute their
+    messages. If any field fails, a single ``ValueError`` lists all messages
+    (decision D6: value-validation failure is distinct from the type ``TypeError``).
+    """
+    errors: list[str] = []
+    for key in slots:
+        validator = validators.get(key)
+        if validator is None:
+            continue
+        result = validator(getattr(self, key))
+        if isinstance(result, Invalid):
+            errors.extend(f"{key}: {message}" for message in result.errors)
+    if errors:
+        raise ValueError("; ".join(errors))
+
+
 def _make_init(
-    slots: tuple[str, ...], defaults: dict[str, Any], annotations: dict[str, type]
+    slots: tuple[str, ...],
+    defaults: dict[str, Any],
+    annotations: dict[str, type],
+    validators: dict[str, Callable[[Any], Any]],
 ) -> Any:
     """Create __init__ method for struct."""
 
@@ -102,6 +138,8 @@ def _make_init(
             value = _get_field_value(key, kwargs, defaults)
             _validate_type(key, value, annotations[key])
             object.__setattr__(self, key, value)
+        if validators:
+            _validate_values(self, slots, validators)
 
     return __init__
 
@@ -186,6 +224,7 @@ def struct(cls: type[T]) -> type[T]:
     annotations = get_type_hints(cls) if hasattr(cls, "__annotations__") else {}
     slots = tuple(annotations.keys())
     defaults = {k: getattr(cls, k) for k in slots if hasattr(cls, k)}
+    validators: dict[str, Callable[[Any], Any]] = getattr(cls, "__validators__", {})
 
     namespace: dict[str, Any] = {
         "__slots__": slots,
@@ -193,7 +232,7 @@ def struct(cls: type[T]) -> type[T]:
         "__match_args__": slots,
         "__stolas_struct__": True,
         "__stolas_fields__": tuple(annotations.items()),
-        "__init__": _make_init(slots, defaults, annotations),
+        "__init__": _make_init(slots, defaults, annotations, validators),
         "__setattr__": _make_setattr(),
         "__delattr__": _make_delattr(),
         "__repr__": _make_repr(cls.__name__, slots),
@@ -207,6 +246,11 @@ def struct(cls: type[T]) -> type[T]:
     # literally named ``replace``; the free function always works regardless.
     if "replace" not in slots:
         namespace["replace"] = _make_replace_method()
+
+    # Carry opt-in field validators onto the generated class for inspection.
+    # Absent ``__validators__`` adds nothing, keeping the class byte-identical.
+    if validators:
+        namespace["__validators__"] = validators
 
     new_cls = cast(type[T], type(cls.__name__, (), namespace))
 
