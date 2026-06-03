@@ -25,6 +25,8 @@ dev = [
     "mypy>=1.19.1",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
+    "ruff>=0.15.0",
+    "bandit>=1.8.0",
 ]
 
 [project.urls]
@@ -38,6 +40,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# Ship the PEP 561 marker and all hand-written type stubs in the wheel/sdist
+# so installed users' type-checkers see stolas as a typed package.
+"*" = ["py.typed", "*.pyi"]
 
 [tool.coverage.run]
 omit = ["src/stolas/mypy_plugin.py"]

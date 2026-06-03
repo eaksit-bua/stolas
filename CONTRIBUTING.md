@@ -9,7 +9,10 @@ We welcome contributions! Stolas is a strict library, so we ask that you follow 
     ```bash
     pip install ".[dev]"
     ```
-3.  **Install pre-commit hooks** (optional but recommended):
+    The `[dev]` extra provides everything you need for the quality gates below:
+    `mypy`, `pytest`, `pytest-cov`, `ruff`, and `bandit`.
+3.  **Pre-commit hooks** (optional): this repo does not ship a
+    `.pre-commit-config.yaml`. If you add one, you can install the hooks with:
     ```bash
     pre-commit install
     ```
